@@ -1,0 +1,7 @@
+pandas
+pandas-datareader
+plotly
+plotly-express
+requests
+streamlit
+yfinance
