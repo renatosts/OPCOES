@@ -334,7 +334,7 @@ if ticker:
 
     st.write(f'''<b>{ticker} R$ {cot_yf.iloc[-1]['Adj Close']:,.2f} <span style="{ws_color}"> {var:,.2%}</span></b>''', unsafe_allow_html=True)
 
-if ticker != '' or aiotm == '' or len(datven) > 0:
+if ticker != '' or len(datven) > 0:
     st.dataframe(df_aux, use_container_width=True)
 
 if ticker:
