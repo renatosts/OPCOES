@@ -1,5 +1,4 @@
 pandas
-pandas-datareader
 plotly
 plotly-express
 requests
