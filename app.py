@@ -172,7 +172,7 @@ with st.sidebar:
         gera_base()
 
 
-col1, col2, col3, col4, col5, col6 = st.columns([1, 1, 1, 2.5, 1, 2])
+col1, col2, col3, col4, col5= st.columns([1, 1, 2, 2.5, 1])
 
 with col1:
     my_ticker = st.selectbox(
@@ -187,7 +187,7 @@ with col2:
     )
 
 with col3:
-    aiotm = st.selectbox(
+    aiotm = st.multiselect(
         label = 'ITM/ATM/OTM',
         options = ['', 'ITM', 'ATM', 'OTM']
     )
@@ -203,21 +203,12 @@ with col5:
         label = 'Negociação (a partir)',
         value = date.today())
 
-with col6:
-    taxas_decr = st.checkbox(
-        label = 'Taxas Decrescentes',
-        value = False
-    )
-    dist_strike = st.checkbox(
-        label = 'Strike 5 a 15%',
-        value = False
-    )
     # weeks = st.checkbox(
     #     label = 'Inclui Semanais',
     #     value = False
     # )
 
-col1, col2, col3 = st.columns([1, 7.5, 2])
+col1, col2, col3, col4 = st.columns([1, 3.5, 1.5, 1.5])
 
 todos_ativos = df.ticker.unique().tolist()
 
@@ -233,6 +224,15 @@ with col2:
         options = [''] + df.ticker.unique().tolist()
     )
 with col3:
+    taxas_decr = st.checkbox(
+        label = 'Taxas Decrescentes',
+        value = False
+    )
+    dist_strike = st.checkbox(
+        label = 'Strike 5 a 15%',
+        value = False
+    )
+with col4:
     fm = st.checkbox(
         label = 'Formador de Mercado',
         value = False
@@ -265,8 +265,8 @@ elif todos_ticker != 'All':
 if tipo != '':
     df = df[df.tipo == tipo]
 
-if aiotm != '':
-    df = df[df.aiotm == aiotm]
+if len(aiotm) > 0:
+    df = df[df.aiotm.isin(aiotm)]
 
 if len(excl_ticker) > 0:
     df = df[~df.ticker.isin(excl_ticker)]
