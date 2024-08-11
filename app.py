@@ -1,4 +1,5 @@
 from datetime import date
+
 import pandas as pd
 import plotly.graph_objects as go
 import streamlit as st
@@ -7,7 +8,7 @@ import zipfile
 
 
 MY_TICKERS = ['VALE3', 'PETR4', 'WEGE3', 'RADL3', 'BBAS3', 'VIVT3',
-              'RENT3', 'JBSS3', 'ARZZ3', 'SLCE3', 'CSNA3', 'EGIE3',
+              'RENT3', 'JBSS3', 'AZZA3', 'SLCE3', 'CSNA3', 'EGIE3',
               'UNIP3', 'BBDC4', 'ITSA4', 'ABEV3', 'HYPE3', 'FLRY3',
               'ALUP11', 'LREN3', 'CSMG3', 'RDOR3', 'SAPR11', 'KLBN4',
               'CIEL3', 'TAEE11', 'CSAN3', 'MGLU3', 'ODPV3', 'FESA4',
@@ -15,9 +16,7 @@ MY_TICKERS = ['VALE3', 'PETR4', 'WEGE3', 'RADL3', 'BBAS3', 'VIVT3',
 
 MY_TICKERS.sort()
 
-def gera_base():
-
-    # Cria opções
+def processa_base_b3():
 
     df = pd.DataFrame()
 
@@ -33,14 +32,15 @@ def gera_base():
 
     ano = date.today().year
 
-    # Processa arquivo zipado
+    # Processa arquivos zipados (ano anterior e ano atual)
     for i in range(ano - 1, ano + 1):
         try:
-            f = f'COTAHIST_A{i}.ZIP'
-            with zipfile.ZipFile(f, 'r') as z:
-                with z.open(f'COTAHIST_A{i}.TXT') as arq:
-                    temp = pd.read_fwf(arq, colspecs=colspecs, names=names)
-            df = pd.concat([df, temp])
+            with st.spinner(f'Processando {i}'):
+                f = f'COTAHIST_A{i}.ZIP'
+                with zipfile.ZipFile(f, 'r') as z:
+                    with z.open(f'COTAHIST_A{i}.TXT') as arq:
+                        temp = pd.read_fwf(arq, colspecs=colspecs, names=names)
+                df = pd.concat([df, temp])
         except:
             pass
 
@@ -71,9 +71,9 @@ def gera_base():
 
     df = df[df.tipo.isin(['AÇÃO', 'CALL', 'PUT'])]
 
-    # Cria base de ações com somente dados da última negociação e obtém ticker
-    acoes = df[(df.tipo == 'AÇÃO') & (df.dataneg == df.dataneg.max())][['ativo', 'tpacao', 'codneg', 'preult']]
-    acoes.rename(columns={'preult': 'ult_cotacao', 'codneg': 'ticker'}, inplace=True)
+    # Cria base de ações para obter ticker
+    acoes = df[(df.tipo == 'AÇÃO') & (df.dataneg == df.dataneg.max())][['ativo', 'tpacao', 'codneg']]
+    acoes.rename(columns={'codneg': 'ticker'}, inplace=True)
 
     # Atribui ticker para as opções e última cotação
     df = df.merge(acoes, on=['ativo', 'tpacao'], how='left')
@@ -81,20 +81,11 @@ def gera_base():
     # Elimina tickers vazios
     df = df[~df.ticker.isna()]
 
-    # df = df[df.ticker.isin(MY_TICKERS)]
-
-    # Salva Cotações
-    cotacoes = df[['tipo', 'codneg', 'dataneg', 'preabe', 'premax', 'premin', 'preult', 'totneg', 'quatot', 'valtot', 'strike', 'datven']
-       ].sort_values(by=['tipo', 'codneg', 'dataneg'])
-    cotacoes.to_parquet('cotacoes.parquet', index=False)
-
-
-    # Tratamento das opções
+    # Permanecem apenas opções
     df = df[df.tipo.isin(['CALL', 'PUT'])]
 
     # Elimina as opções vencidas
     df = df[df.datven >= date.today().strftime("%Y-%m-%d")]
-
 
     df['estilo'] = df['estilo'].fillna('A')
     df['nomres'] = df['nomres'].fillna('')
@@ -102,13 +93,52 @@ def gera_base():
     df['fm'] = ' '
     df.loc[df.nomres.str.contains('FM'), 'fm'] = 'FM'
 
+    # Salva Cotações das Opções
+    cotacoes_opcoes = df[['tipo', 'codneg', 'dataneg', 'preabe', 'premax', 'premin', 'preult', 'totneg', 'quatot', 'valtot', 'datven', 'strike']
+       ].sort_values(by=['tipo', 'codneg', 'dataneg'])
+    cotacoes_opcoes.to_parquet('cotacoes_opcoes.parquet', index=False)
 
     # Deixa dados da última negociação
     indices_max_dataneg = df.groupby('codneg')['dataneg'].idxmax()
     df = df.loc[indices_max_dataneg]
 
-    df = df.sort_values(by=['ativo', 'tpacao', 'datven', 'codneg', 'dataneg'])
+    df = df.sort_values(by=['ativo', 'tpacao', 'datven', 'strike'])
 
+    # Salva Opções
+    df.to_parquet('opcoes.parquet', index=False)
+
+    return df
+
+
+def define_color(val):
+
+    if val < 0:
+        color = 'red'
+    elif val > 0:
+        color = 'green'
+    else:
+        color = 'gray'
+    return 'color: %s' % color
+
+
+def gera_base_opcoes():
+
+    df = read_opcoes()
+
+    # Read cotações das ações
+    cotacoes_acoes = read_cotacoes_acoes()
+
+    # Obtém última cotação
+    data_maxima = cotacoes_acoes.index.max()
+    ult_cot = cotacoes_acoes[cotacoes_acoes.index == data_maxima]['Close'].T
+    ult_cot['ticker'] = ult_cot.index.str.replace('.SA', '')
+    ult_cot.columns = ['ult_cotacao', 'ticker']
+
+    # Determina ATM, ITM, OTM
+
+    df = opcoes.merge(ult_cot, on='ticker', how='left')
+
+    df['dias'] = (df['datven'] - pd.to_datetime(date.today())).dt.days
 
     df['dist_strike'] = df['strike'] /  df['ult_cotacao'] - 1
 
@@ -121,23 +151,36 @@ def gera_base():
 
     df['taxa'] = df['preult'] /  df['ult_cotacao']
 
-    df['dias'] = (df['datven'] - pd.to_datetime(date.today())).dt.days
-
-    # Salva Opções
-    df.to_parquet('opcoes.parquet', index=False)
+    df.to_parquet('opcoes_final.parquet', index=False)
 
 
-def define_color(val):
-    if val < 0:
-        color = 'red'
-    elif val > 0:
-        color = 'green'
-    else:
-        color = 'gray'
-    return 'color: %s' % color
+@st.cache_data
+def read_cotacoes_acoes():
+    return pd.read_parquet('cotacoes_acoes.parquet')
 
 
-# gera_base()
+@st.cache_data
+def read_cotacoes_opcoes():
+    return pd.read_parquet('cotacoes_opcoes.parquet')
+
+
+@st.cache_data
+def read_opcoes():
+    return pd.read_parquet('opcoes.parquet')
+
+
+@st.cache_data
+def read_opcoes_final():
+    return pd.read_parquet('opcoes_final.parquet')
+
+
+def update_cotacoes_acoes(opcoes):
+    with st.spinner('Cotações Yahoo Finance'):
+        lista_ticker = opcoes.ticker.unique().tolist()
+        lista_ticker = [x + '.SA' for x in lista_ticker]
+        cot = yf.download(tickers=lista_ticker, period='100d', interval='1d')
+        cot.to_parquet('cotacoes_acoes.parquet')
+
 
 st.set_page_config(
     layout='wide',
@@ -146,30 +189,26 @@ st.set_page_config(
     page_title='Opções')
 
 
-@st.cache_data
-def read_cotacoes():
-    return pd.read_parquet('cotacoes.parquet')
+with st.sidebar:
 
-@st.cache_data
-def read_opcoes():
-    return pd.read_parquet('opcoes.parquet')
+    if st.button('Processa Base B3'):
+        opcoes = processa_base_b3()
+        update_cotacoes_acoes(opcoes)
+        gera_base_opcoes()
 
-df = read_opcoes()
+    if st.button('Atualiza Cotações'):
+        opcoes = read_opcoes()
+        update_cotacoes_acoes(opcoes)
+        gera_base_opcoes()
 
-cotacoes =read_cotacoes()
 
+# Read bases de opções e cotações
+cotacoes_opcoes = read_cotacoes_opcoes()
+cotacoes_acoes = read_cotacoes_acoes()
+df = read_opcoes_final()
 
 opt_dataneg = df.dataneg.sort_values(ascending=False).dt.strftime('%d/%m/%Y').unique()
 opt_datven = df.datven.sort_values().dt.strftime('%d/%m/%Y').unique()
-
-
-# Gera Base Opções  dataneg_hoje = datetime.today().strftime('%Y-%m-%d %H:%M:%S')
-# 
-with st.sidebar:
-    
-
-    if st.button('Gera Base Opções'):
-        gera_base()
 
 
 col1, col2, col3, col4, col5= st.columns([1, 1, 2, 2.5, 1])
@@ -202,11 +241,6 @@ with col5:
     dataneg = st.date_input(
         label = 'Negociação (a partir)',
         value = date.today())
-
-    # weeks = st.checkbox(
-    #     label = 'Inclui Semanais',
-    #     value = False
-    # )
 
 col1, col2, col3, col4 = st.columns([1, 3.5, 1.5, 1.5])
 
@@ -322,17 +356,27 @@ df_aux = df_aux.style.format(
         'ult_cotacao': '{:,.2f}',
         'taxa': '{:.2%}',
         'dist_strike': '{:.2%}'})
-    
 
-df_cot = cotacoes[cotacoes.codneg == ticker].tail(200)
+# label=list(df_aux.columns.values) 
+# df_aux.relabel_index(['Tipo', 'FM', 'estilo', 'datven', 'dias',
+#                 'strike', 'ult_cotacao', 'dist_strike', 'aiotm',
+#                 'dataneg', 'preofc', 'preofv', 'totneg', 'valtot',
+#                 'preult', 'taxa'])
+
+df_cot = cotacoes_opcoes[cotacoes_opcoes.codneg == ticker].tail(200)
 
 if ticker:
-    
-    cot_yf = yf.download(f'{ticker}.SA', period='100d')
-    var = cot_yf.iloc[-1]['Adj Close'] / cot_yf.iloc[-2]['Adj Close'] - 1
+
+    cot_open = cotacoes_acoes[('Open', f'{ticker}.SA')]
+    cot_close = cotacoes_acoes[('Adj Close', f'{ticker}.SA')]
+    cot_high = cotacoes_acoes[('High', f'{ticker}.SA')]
+    cot_low = cotacoes_acoes[('Low', f'{ticker}.SA')]
+
+    cot = cotacoes_acoes[('Adj Close', f'{ticker}.SA')]
+    var = cot.iloc[-1] / cot.iloc[-2] - 1
     ws_color = define_color(var)
 
-    st.write(f'''<b>{ticker} R$ {cot_yf.iloc[-1]['Adj Close']:,.2f} <span style="{ws_color}"> {var:,.2%}</span></b>''', unsafe_allow_html=True)
+    st.write(f'''<b>{ticker} R$ {cot.iloc[-1]:,.2f} <span style="{ws_color}"> {var:,.2%}</span></b>''', unsafe_allow_html=True)
 
 if ticker != '' or len(datven) > 0:
     st.dataframe(df_aux, use_container_width=True)
@@ -340,25 +384,27 @@ if ticker != '' or len(datven) > 0:
 if ticker:
 
     fig = go.Figure(data=[
-        go.Candlestick(x=cot_yf.index,
-                      open=cot_yf['Open'],
-                      high=cot_yf['High'],
-                      low=cot_yf['Low'],
-                      close=cot_yf['Adj Close'])])
+        go.Candlestick(x=cot.index,
+                      open=cot_open,
+                      high=cot_high,
+                      low=cot_low,
+                      close=cot_close)])
 
-    fig.update_layout(xaxis_rangeslider_visible=False,
-                          showlegend=False,
-                          legend=dict(orientation='h',
-                                      yanchor='bottom',
-                                      y=1,
-                                      xanchor='right',
-                                      x=1))
+    fig.update_layout(
+        xaxis_rangeslider_visible=False,
+        showlegend=False,
+        legend=dict(
+            orientation='h',
+            yanchor='bottom',
+            y=1,
+            xanchor='right',
+            x=1))
+    
     st.plotly_chart(fig, use_container_width=True)
 
     if graf_opcoes:
         for i in lista_codneg:
-            df_cot = cotacoes[cotacoes.codneg == i]
-            # st.table(df_cot)
+            df_cot = cotacoes_opcoes[cotacoes_opcoes.codneg == i]
 
             try:
                 cot_atu = df_cot.iloc[-1]['preult']
