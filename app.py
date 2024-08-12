@@ -1,5 +1,4 @@
-from datetime import date
-
+import datetime
 import pandas as pd
 import plotly.graph_objects as go
 import streamlit as st
@@ -30,7 +29,7 @@ def processa_base_b3():
              'preult', 'preofc', 'preofv', 'totneg', 'quatot',
              'valtot', 'strike', 'datven', 'factot', 'estilo']
 
-    ano = date.today().year
+    ano = datetime.date.today().year
 
     # Processa arquivos zipados (ano anterior e ano atual)
     for i in range(ano - 1, ano + 1):
@@ -154,6 +153,13 @@ def gera_base_opcoes():
     df.to_parquet('opcoes_final.parquet', index=False)
 
 
+# Função para colorir células da coluna 'Data de Negociação' se diferente de uma data específica
+def highlight_dates(val, specific_date):
+    if pd.isna(val):  # Se o valor é NaN, não aplica a cor
+        return ''
+    return 'color: green' if val.date() == specific_date.date() else ''
+
+
 @st.cache_data
 def read_cotacoes_acoes():
     return pd.read_parquet('cotacoes_acoes.parquet')
@@ -185,7 +191,7 @@ def update_cotacoes_acoes(opcoes):
 st.set_page_config(
     layout='wide',
     initial_sidebar_state='collapsed',
-    page_icon='app.jpg',
+    page_icon='app.ico',
     page_title='Opções')
 
 
@@ -240,7 +246,7 @@ with col4:
 with col5:
     dataneg = st.date_input(
         label = 'Negociação (a partir)',
-        value = date.today())
+        value = datetime.date.today())
 
 col1, col2, col3, col4 = st.columns([1, 3.5, 1.5, 1.5])
 
@@ -308,10 +314,10 @@ if len(excl_ticker) > 0:
 if len(datven) > 0:
     df = df[df.datven.isin(datven)]
 
+max_dataneg = df.dataneg.max()
 if dataneg:
-    max_dataneg = df.dataneg.max()
-    if pd.to_datetime(dataneg) > max_dataneg:
-        dataneg = max_dataneg
+    if dataneg >= datetime.date.today():
+        dataneg = max_dataneg - datetime.timedelta(days=5)
     df = df[df.dataneg >= pd.to_datetime(dataneg)]
 
 if taxas_decr:
@@ -329,33 +335,72 @@ df_aux = df.copy()
 ult_cot = df_aux.ult_cotacao.max()
 
 df_aux = df_aux[['tipo', 'fm', 'estilo', 'codneg', 'datven', 'dias',
-                 'strike', 'ult_cotacao', 'dist_strike', 'aiotm',
+                 'ult_cotacao', 'strike', 'dist_strike', 'aiotm',
                  'dataneg', 'preofc', 'preofv', 'totneg', 'valtot',
                  'preult', 'taxa']].reset_index(drop=True)
 
 lista_codneg = df_aux.codneg.tolist()
 
-df_aux = df_aux.set_index('codneg')
 
+df_aux.columns = [
+    'Tipo', 'FM', 'Estilo', 'Ticker', 'Vencimento', 'Dias',
+    'Cotação', 'Strike', 'Distância Strike', 'AIOTM',
+    'Últ Negociação', 'Bid', 'Ask', 'Negócios', 'Total',
+    'Última Cot', 'Taxa'
+]
 
-df_aux = df_aux.style.format(
+# Definir o índice para 'Código Negociável'
+df_aux = df_aux.set_index('Ticker')
+
+# Aplicar formatação
+styled_df = df_aux.style.format(
     thousands=".",
-    decimal = ",",
+    decimal=",",
     formatter={
-        'datven': '{:%d/%m/%Y}',
-        'dataneg': '{:%d/%m/%Y}',
-        'preabe': '{:,.2f}',
-        'premax': '{:,.2f}',
-        'premin': '{:,.2f}',
-        'preult': '{:,.2f}',
-        'preofc': '{:,.2f}',
-        'preofv': '{:,.2f}',
-        'totneg': '{:,.0f}',
-        'valtot': '{:,.0f}',
-        'strike': '{:,.2f}',
-        'ult_cotacao': '{:,.2f}',
-        'taxa': '{:.2%}',
-        'dist_strike': '{:.2%}'})
+        'Vencimento': '{:%d/%m/%Y}',
+        'Últ Negociação': '{:%d/%m/%Y}',
+        'Bid': '{:,.2f}',
+        'Ask': '{:,.2f}',
+        'Cotação': '{:,.2f}',
+        'Negócios': '{:,.0f}',
+        'Total': '{:,.0f}',
+        'Strike': '{:,.2f}',
+        'Última Cot': '{:,.2f}',
+        'Taxa': '{:.2%}',
+        'Distância Strike': '{:.2%}'
+    }
+)
+
+# Data específica a ser usada
+specific_date = max_dataneg
+
+# Aplicar o estilo
+styled_df = styled_df.map(
+    lambda val: highlight_dates(val, specific_date),
+    subset=['Últ Negociação']
+)
+
+# df_aux = df_aux.set_index('codneg')
+
+
+# df_aux = df_aux.style.format(
+#     thousands=".",
+#     decimal = ",",
+#     formatter={
+#         'datven': '{:%d/%m/%Y}',
+#         'dataneg': '{:%d/%m/%Y}',
+#         'preabe': '{:,.2f}',
+#         'premax': '{:,.2f}',
+#         'premin': '{:,.2f}',
+#         'preult': '{:,.2f}',
+#         'preofc': '{:,.2f}',
+#         'preofv': '{:,.2f}',
+#         'totneg': '{:,.0f}',
+#         'valtot': '{:,.0f}',
+#         'strike': '{:,.2f}',
+#         'ult_cotacao': '{:,.2f}',
+#         'taxa': '{:.2%}',
+#         'dist_strike': '{:.2%}'})
 
 # label=list(df_aux.columns.values) 
 # df_aux.relabel_index(['Tipo', 'FM', 'estilo', 'datven', 'dias',
@@ -379,7 +424,7 @@ if ticker:
     st.write(f'''<b>{ticker} R$ {cot.iloc[-1]:,.2f} <span style="{ws_color}"> {var:,.2%}</span></b>''', unsafe_allow_html=True)
 
 if ticker != '' or len(datven) > 0:
-    st.dataframe(df_aux, use_container_width=True)
+    st.dataframe(styled_df, use_container_width=True)
 
 if ticker:
 
