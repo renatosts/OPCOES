@@ -8,7 +8,7 @@ import zipfile
 
 MY_TICKERS = ['VALE3', 'PETR4', 'WEGE3', 'RADL3', 'BBAS3', 'VIVT3',
               'RENT3', 'JBSS3', 'AZZA3', 'SLCE3', 'CSNA3', 'EGIE3',
-              'UNIP3', 'BBDC4', 'ITSA4', 'ABEV3', 'HYPE3', 'FLRY3',
+              'UNIP6', 'BBDC4', 'ITSA4', 'ABEV3', 'HYPE3', 'FLRY3',
               'ALUP11', 'LREN3', 'CSMG3', 'RDOR3', 'SAPR11', 'KLBN4',
               'CIEL3', 'TAEE11', 'CSAN3', 'MGLU3', 'ODPV3', 'FESA4',
               'BBSE3', 'GOLL4', 'CVCB3', 'BHIA3', 'BOVA11']
