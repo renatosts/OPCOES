@@ -84,7 +84,7 @@ def processa_base_b3():
     df = df[df.tipo.isin(['CALL', 'PUT'])]
 
     # Elimina as opções vencidas
-    df = df[df.datven >= date.today().strftime("%Y-%m-%d")]
+    df = df[df.datven >= datetime.date.today().strftime("%Y-%m-%d")]
 
     df['estilo'] = df['estilo'].fillna('A')
     df['nomres'] = df['nomres'].fillna('')
@@ -137,7 +137,7 @@ def gera_base_opcoes():
 
     df = opcoes.merge(ult_cot, on='ticker', how='left')
 
-    df['dias'] = (df['datven'] - pd.to_datetime(date.today())).dt.days
+    df['dias'] = (df['datven'] - pd.to_datetime(datetime.date.today())).dt.days
 
     df['dist_strike'] = df['strike'] /  df['ult_cotacao'] - 1
 
@@ -375,7 +375,7 @@ styled_df = df_aux.style.format(
 specific_date = max_dataneg
 
 # Aplicar o estilo
-styled_df = styled_df.map(
+styled_df = styled_df.applymap(
     lambda val: highlight_dates(val, specific_date),
     subset=['Últ Negociação']
 )
