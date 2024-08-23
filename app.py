@@ -74,7 +74,7 @@ def processa_base_b3():
     acoes = df[(df.tipo == 'AÇÃO') & (df.dataneg == df.dataneg.max())][['ativo', 'tpacao', 'codneg']]
     acoes.rename(columns={'codneg': 'ticker'}, inplace=True)
 
-    # Atribui ticker para as opções e última cotação
+    # Atribui ticker para as opções e Prêmioação
     df = df.merge(acoes, on=['ativo', 'tpacao'], how='left')
 
     # Elimina tickers vazios
@@ -127,7 +127,7 @@ def gera_base_opcoes():
     # Read cotações das ações
     cotacoes_acoes = read_cotacoes_acoes()
 
-    # Obtém última cotação
+    # Obtém Prêmioação
     data_maxima = cotacoes_acoes.index.max()
     ult_cot = cotacoes_acoes[cotacoes_acoes.index == data_maxima]['Close'].T
     ult_cot['ticker'] = ult_cot.index.str.replace('.SA', '')
@@ -149,6 +149,8 @@ def gera_base_opcoes():
     df.loc[(df.dist_strike >= -0.02) & (df.dist_strike <= 0.02), 'aiotm'] = 'ATM'
 
     df['taxa'] = df['preult'] /  df['ult_cotacao']
+
+    df['vlr_intrinseco'] = abs(df['strike'] -  df['ult_cotacao'])
 
     df.to_parquet('opcoes_final.parquet', index=False)
 
@@ -335,18 +337,18 @@ df_aux = df.copy()
 ult_cot = df_aux.ult_cotacao.max()
 
 df_aux = df_aux[['tipo', 'fm', 'estilo', 'codneg', 'datven', 'dias',
-                 'ult_cotacao', 'strike', 'dist_strike', 'aiotm',
+                 'strike', 'ult_cotacao', 'dist_strike', 'aiotm',
                  'dataneg', 'preofc', 'preofv', 'totneg', 'valtot',
-                 'preult', 'taxa']].reset_index(drop=True)
+                 'vlr_intrinseco', 'preult', 'taxa']].reset_index(drop=True)
 
 lista_codneg = df_aux.codneg.tolist()
 
 
 df_aux.columns = [
     'Tipo', 'FM', 'Estilo', 'Ticker', 'Vencimento', 'Dias',
-    'Cotação', 'Strike', 'Distância Strike', 'AIOTM',
-    'Últ Negociação', 'Bid', 'Ask', 'Negócios', 'Total',
-    'Última Cot', 'Taxa'
+    'Strike', 'Cotação', 'Distância', 'AIO',
+    'Negociação', 'Bid', 'Ask', 'Negócios', 'Total',
+    'Vlr. Intr', 'Prêmio', 'Taxa'
 ]
 
 # Definir o índice para 'Código Negociável'
@@ -358,16 +360,17 @@ styled_df = df_aux.style.format(
     decimal=",",
     formatter={
         'Vencimento': '{:%d/%m/%Y}',
-        'Últ Negociação': '{:%d/%m/%Y}',
+        'Negociação': '{:%d/%m/%Y}',
         'Bid': '{:,.2f}',
         'Ask': '{:,.2f}',
         'Cotação': '{:,.2f}',
         'Negócios': '{:,.0f}',
         'Total': '{:,.0f}',
         'Strike': '{:,.2f}',
-        'Última Cot': '{:,.2f}',
+        'Prêmio': '{:,.2f}',
+        'Vlr. Intr': '{:,.2f}',
         'Taxa': '{:.2%}',
-        'Distância Strike': '{:.2%}'
+        'Distância': '{:.2%}'
     }
 )
 
@@ -377,7 +380,7 @@ specific_date = max_dataneg
 # Aplicar o estilo
 styled_df = styled_df.applymap(
     lambda val: highlight_dates(val, specific_date),
-    subset=['Últ Negociação']
+    subset=['Negociação']
 )
 
 # df_aux = df_aux.set_index('codneg')
