@@ -170,6 +170,30 @@ def define_color_aio(val):
     return 'color: %s' % color
 
 
+def define_color_estilo(val):
+
+    if val == 'A':
+        color = 'red'
+    else:
+        color = 'white'
+    return 'color: %s' % color
+
+
+def define_color_negocios(val):
+
+    if val > 200:
+        color = 'green'
+    elif val > 100:
+        color = 'yellow'
+    elif val > 10:
+        color = 'orange'
+    elif val > 1:
+        color = 'white'
+    else:
+        color = 'grey'
+    return 'color: %s' % color
+
+
 def define_color_tipo(val):
 
     if val == 'CALL':
@@ -447,13 +471,13 @@ def gera_base_opcoes(lista_acoes=None):
 
         df['dist_strike'] = round(df['strike'] /  df['cotacao'] - 1, 4)
 
+        # Moneyness (ATM, ITM, OTM)
         df['aiotm'] = ''
         df.loc[(df.dist_strike == 0), 'aiotm'] = 'ATM'
         df.loc[(df.tipo == 'CALL') & (df.dist_strike < 0), 'aiotm'] = 'ITM'
         df.loc[(df.tipo == 'CALL') & (df.dist_strike > 0), 'aiotm'] = 'OTM'
         df.loc[(df.tipo == 'PUT') & (df.dist_strike > 0), 'aiotm'] = 'ITM'
         df.loc[(df.tipo == 'PUT') & (df.dist_strike < 0), 'aiotm'] = 'OTM'
-
 
         # Identifica opções ATM (mais próximas do strike)
         base = df[(df.dist_strike.abs() <= 0.01)] # somente diferença de até 1%
@@ -472,22 +496,22 @@ def gera_base_opcoes(lista_acoes=None):
         idx = base[(base.tipo == 'PUT') & (base.dist_strike > 0)].groupby(['ticker', 'datven'])['dist_strike'].idxmin()
         df.loc[idx, 'aiotm'] = 'ATM'
 
-
+        # Taxa
         df['taxa'] = round(df['premio'] / df['cotacao'], 4)
 
+        # Valor Intrínseco
         df['vi'] = 0.0
-        df.loc[(df.aiotm == 'ITM') & (df.tipo == 'CALL'), 'vi'] = df['cotacao'] - df['strike']  # CALL / ITM ou ATM
-        df.loc[(df.aiotm == 'ITM') & (df.tipo == 'PUT'), 'vi'] = df['strike'] - df['cotacao'] # CALL / ITM ou ATM
-        df['vi'] = round(df['vi'], 2)
+        df.loc[(df.aiotm == 'ITM') & (df.tipo == 'CALL'), 'vi'] = df['cotacao'] - df['strike']  # CALL
+        df.loc[(df.aiotm == 'ITM') & (df.tipo == 'PUT'), 'vi'] = df['strike'] - df['cotacao'] # PUT
 
+        # Valor Extrínseco
         df['ve'] = df['premio'] - df['vi']
+        df['ve_perc'] = round(df['ve'] / df['cotacao'], 4)
 
+        # Breakeven
         df['breakeven'] = 0.0
         df.loc[df.tipo == 'PUT', 'breakeven'] = df['strike'] - df['premio']
         df.loc[df.tipo == 'CALL', 'breakeven'] = df['strike'] + df['premio']
-
-        df['ve_perc'] = round(df['ve'] / df['cotacao'], 4)
-
 
     # Apuração Black & Scholes
 
@@ -499,7 +523,6 @@ def gera_base_opcoes(lista_acoes=None):
         # Calcular a volatilidade implícita para cada linha do DataFrame
         df['volatilidade_implicita'] = df.apply(calcular_volatilidade, axis=1, args=(r,))
 
-
     with st.spinner('Black & Scholes'):
 
         # Aplicar a função a cada linha do DataFrame
@@ -510,7 +533,6 @@ def gera_base_opcoes(lista_acoes=None):
 
         # Concatenar os resultados no DataFrame original
         df = pd.concat([df, greeks_df], axis=1)
-
 
         df['delta'] = 0.0
         df.loc[(df.tipo == 'CALL'), 'delta'] = df['Delta Call']
@@ -555,7 +577,6 @@ def gera_base_opcoes(lista_acoes=None):
 def gera_estrutura_trava():
 
     with st.spinner('Gerando Base Travas'):
-
 
         lista_tickers = read_lista_tickers()
 
@@ -653,6 +674,7 @@ def grafico_cotacao_acoes(df, ticker, bollinger=True):
             low=cot.Low,
             close=cot.Close,
             name='Candlestick'))
+
     fig.add_trace(
         go.Scatter(
             x=cot.Date,
@@ -690,7 +712,7 @@ def grafico_cotacao_acoes(df, ticker, bollinger=True):
     
     fig.update_layout(
         xaxis_rangeslider_visible=False,
-        showlegend=False,
+        showlegend=True,
         height=600,
         legend=dict(
             orientation='h',
@@ -839,7 +861,7 @@ def highlight_dates(val, specific_date):
         return ''
     w_color = ''
     if val.date() == specific_date.date():
-        w_color = 'color: purple'
+        w_color = 'color: orange'
     elif val.date() > specific_date.date():
         w_color = 'color: yellow'
     return w_color
@@ -1032,7 +1054,7 @@ def main():
     # Data específica a ser usada
     specific_date = max_dataneg
 
-    # Aplicar o estilo
+    # Aplicar cor para data do pregão
     styled_df = styled_df.map(
         lambda val: highlight_dates(val, specific_date),
         subset=['Preg']
@@ -1046,6 +1068,12 @@ def main():
 
     # Aplicar cor para ATM
     styled_df = styled_df.map(define_color_aio, subset=['AIO'])
+
+    # Aplicar cor para número de negócios
+    styled_df = styled_df.map(define_color_negocios, subset=['Neg'])
+
+    # Aplicar cor para número de estilo
+    styled_df = styled_df.map(define_color_estilo, subset=['Est'])
 
     # Aplicar cor para cotação
     styled_df = styled_df.map(define_color_cotacao, subset=['Cot'])
@@ -1198,7 +1226,7 @@ def input_cotacoes_yfinance():
             # Ajusta lista de tickers
             lista_ticker_yahoo = [x + '.SA' for x in lista_ticker]
             # Acessa YFinance e salva em banco de dados
-            df = yf.download(tickers=lista_ticker_yahoo, period='1y', interval='1d')
+            df = yf.download(tickers=lista_ticker_yahoo, period='1y')
             df = df.round(decimals=2)
             df = df.stack(level=1, future_stack=True).rename_axis(['Date', 'Ticker']).reset_index(level=1)
             df = df.reset_index()
@@ -1234,6 +1262,7 @@ with st.sidebar:
 
     if st.button('Importa Base B3'):
         opcoes = importa_base_b3()
+        input_cotacoes_yfinance()
         gera_base_opcoes()
         gera_estrutura_trava()
 
