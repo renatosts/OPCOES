@@ -1,5 +1,3 @@
-from my_metadata import MY_ACOES, TOKEN
-from oplab import get_ranking_acoes
 import datetime
 import oplab_to_database
 import pandas as pd
@@ -9,6 +7,9 @@ import streamlit as st
 
 
 conn = sqlite3.connect('oplab_db.sqlite3')
+
+# Obtém TOKEN para acesso a API
+TOKEN = st.secrets['OPLAB_TOKEN']
 
 
 def atualiza_cotacoes(conn, hoje, TOKEN):

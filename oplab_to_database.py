@@ -1,4 +1,4 @@
-from my_metadata import MY_ACOES, TOKEN
+from my_metadata import MY_ACOES
 import datetime
 import oplab
 import pandas as pd
