@@ -632,7 +632,7 @@ def quadro_opcoes():
     df_aux.columns = [
         'Tipo', 'FM', 'Est', 'Ticker', 'Vencto', 'Dias',
         'Strike', 'Cot', 'Distância', 'AIO', 
-        'Bid', 'Ask', 'Liquidez $',
+        'Bid', 'Ask', 'Volume $',
         'VI', 'VE', 'BkEv', 'VE %', 'Prêmio', 'Taxa'
     ]
 
@@ -652,7 +652,7 @@ def quadro_opcoes():
             'Cot': '{:,.2f}',
             'Neg': '{:,.0f}',
             'Dias': '{:,.0f}',
-            'Liquidez $': '{:,.0f}',
+            'Volume $': '{:,.0f}',
             'B&S': '{:,.2f}',
             'Strike': '{:,.2f}',
             'Prêmio': '{:,.2f}',
